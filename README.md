@@ -6,6 +6,28 @@ Even more minimal, definitively faster and at least as pretty as the original Pu
 
 ## Installation — Usage
 
+### Using Just (Recommended)
+
+If you have [just](https://github.com/casey/just) installed:
+
+```bash
+# Build release and install to ~/.local/bin/pure
+just install
+
+# Then add to your shell config
+eval "$(~/.local/bin/pure init zsh)"
+
+# Uninstall later
+just uninstall
+```
+
+To install just:
+- macOS: `brew install just`
+- Linux: `cargo install just` or download from [releases](https://github.com/casey/just/releases)
+- Or run via `cargo binstall just` for fast binary install
+
+### Manual Build
+
 1. Set up your Zig environment (0.11.0 or later)
 2. `$ zig build -Doptimize=ReleaseSafe`
 3. Add the appropriate init to your shell config:
@@ -109,13 +131,47 @@ export PURE_ICON_MODIFIED="M"
 
 ## Building
 
+### Using Just
+
+If you have [just](https://github.com/casey/just) installed, use the provided `justfile`:
+
 ```bash
-zig build
+# Show all available recipes
+just --list
+
+# Build debug
+just build
+
+# Build release (recommended)
+just build-release
+
+# Run tests
+just test
+
+# Format code
+just fmt
+
+# Clean build artifacts
+just clean
+
+# Full rebuild cycle
+just rebuild
 ```
 
-For release build:
+See `just --list` for all available recipes.
+
+### Manual Build
+
 ```bash
+# Debug build
+zig build
+
+# Release build (recommended)
 zig build -Doptimize=ReleaseSafe
+
+# Other release modes
+zig build -Doptimize=ReleaseFast    # Fastest runtime, slower compile
+zig build -Doptimize=ReleaseSmall   # Smallest binary size
 ```
 
 ## Running
