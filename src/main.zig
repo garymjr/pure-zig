@@ -433,6 +433,12 @@ fn printZshInit(allocator: std.mem.Allocator, writer: anytype, config: Config) !
         \\export PURE_ICON_MODIFIED="{s}"
         \\export PURE_ICON_UNTRACKED="{s}"
         \\
+        \\# Update prompt on keymap change (vi mode)
+        \\zle-keymap-select() {{
+        \\    zle reset-prompt
+        \\}}
+        \\zle -N zle-keymap-select
+        \\
         \\# Pre-command: show directory and git branch
         \\pure_precmd() {{
         \\    "{s}" precmd
@@ -482,6 +488,11 @@ fn printFishInit(allocator: std.mem.Allocator, writer: anytype, config: Config) 
         \\function pure_prompt
         \\    set -l ret $status
         \\    set -l keymap ""
+        \\    if set -q fish_bind_mode
+        \\        if test "$fish_bind_mode" = "default"
+        \\            set keymap "vicmd"
+        \\        end
+        \\    end
         \\    set -l venv (string replace -r '.*/' '' -- "$VIRTUAL_ENV" 2>/dev/null; or echo "")
         \\    set -l jobs (count (jobs -p))
         \\    "{s}" prompt -r "$ret" -k "$keymap" --venv "$venv" -j "$jobs"
@@ -606,7 +617,7 @@ pub fn main() !void {
         try precmdCommand(allocator, config);
     } else if (std.mem.eql(u8, command, "prompt")) {
         var last_return_code: []const u8 = "0";
-        var keymap: []const u8 = "US";
+        var keymap: []const u8 = "";
         var venv_name: []const u8 = "";
         var job_count: usize = 0;
 
