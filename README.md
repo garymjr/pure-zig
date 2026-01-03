@@ -14,6 +14,9 @@ Even more minimal, definitively faster and at least as pretty as the original Pu
 Add the following to your `~/.zshrc`:
 
 ```zsh
+# Enable vi mode
+bindkey -v
+
 function zle-line-init zle-keymap-select {
   PROMPT=`/PATH/TO/PURE-ZIG/zig-out/bin/pure prompt -k "$KEYMAP" -r "$?" --venv "${${VIRTUAL_ENV:t}%-*}"`
   zle reset-prompt
@@ -34,6 +37,9 @@ add-zsh-hook precmd _prompt_pure_precmd
 Add the following to your `~/.config/fish/config.fish`:
 
 ```fish
+# Enable vi mode
+fish_vi_key_bindings
+
 set -x PURE_ZIG_PATH /PATH/TO/PURE-ZIG/zig-out/bin/pure
 
 function fish_prompt
@@ -46,7 +52,13 @@ function fish_prompt
     set venv_name (string replace -r '-.*' '' $venv_name)
   end
 
+  # Map fish bind modes to pure-zig keymap names
+  # In fish vi mode: "default" = normal mode, "insert" = insert mode
   set -l keymap $fish_bind_mode
+  if test "$keymap" != "insert"
+    set keymap "vicmd"
+  end
+
   $PURE_ZIG_PATH prompt -r "$last_status" -k "$keymap" --venv "$venv_name"
 end
 
@@ -54,20 +66,17 @@ function _pure_fish_prompt --on-event fish_prompt
   $PURE_ZIG_PATH precmd
 end
 
-# Optional: hide default mode prompt if using vi mode
+# Hide default mode prompt
 function fish_mode_prompt
   # Return empty to hide default mode indicator
 end
-
-# Enable vi mode (optional)
-fish_vi_key_bindings
 ```
 
 ## Features
 
 - **Path shortening**: Replaces home directory with `~` and compresses long paths
 - **Git status**: Shows branch, modified files, and git action (rebase, merge, etc.)
-- **Vi mode indication**: Different symbols for INSERT (`❯`) and COMMAND (`⬢`) modes
+- **Vi mode indication**: Different symbols for INSERT (`❯`) and NORMAL (`❮`) modes
 - **Return code indication**: Prompt color changes based on last command exit status
 - **Python virtual environment**: Shows active venv name
 

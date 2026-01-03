@@ -1,11 +1,10 @@
 const std = @import("std");
 const array_list = std.array_list;
 
-const ARROW_SYMBOL = "➜";
 const INSERT_SYMBOL = "❯";
-const COMMAND_SYMBOL = "⬢";
+const NORMAL_SYMBOL = "❮";
 const JOB_SYMBOL = "●";
-const COMMAND_KEYMAP = "vicmd";
+const NORMAL_KEYMAP = "vicmd";
 
 const Color = enum {
     black,
@@ -53,10 +52,10 @@ const Color = enum {
 const reset = "\x1b[0m";
 
 fn promptCommand(allocator: std.mem.Allocator, last_return_code: []const u8, keymap: []const u8, venv_name: []const u8, job_count: usize) !void {
-    const symbol = if (std.mem.eql(u8, keymap, COMMAND_KEYMAP)) COMMAND_SYMBOL else INSERT_SYMBOL;
+    const symbol = if (std.mem.eql(u8, keymap, NORMAL_KEYMAP)) NORMAL_SYMBOL else INSERT_SYMBOL;
 
     const shell_color: Color = blk: {
-        if (std.mem.eql(u8, symbol, COMMAND_SYMBOL)) break :blk Color.yellow;
+        if (std.mem.eql(u8, symbol, NORMAL_SYMBOL)) break :blk Color.yellow;
         if (std.mem.eql(u8, last_return_code, "0")) break :blk Color.magenta;
         break :blk Color.red;
     };
