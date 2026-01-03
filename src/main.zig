@@ -60,8 +60,10 @@ fn promptCommand(allocator: std.mem.Allocator, last_return_code: []const u8, key
         break :blk Color.red;
     };
 
-    const venv = if (venv_name.len > 0)
-        try std.fmt.allocPrint(allocator, "{s}|{s}|{s} ", .{ Color.fgBright(Color.green), venv_name, reset })
+    // Trim whitespace from venv_name and check if it's non-empty
+    const venv_trimmed = std.mem.trim(u8, venv_name, &std.ascii.whitespace);
+    const venv = if (venv_trimmed.len > 0)
+        try std.fmt.allocPrint(allocator, "{s}|{s}|{s} ", .{ Color.fgBright(Color.green), venv_trimmed, reset })
     else
         "";
 
@@ -313,26 +315,111 @@ fn precmdCommand(allocator: std.mem.Allocator, detailed: bool) !void {
     try stdout.print("\n", .{});
 }
 
+fn getExecutablePath(allocator: std.mem.Allocator) ![]const u8 {
+    const self_path = try std.fs.selfExePathAlloc(allocator);
+    return self_path;
+}
+
+fn printBashInit(allocator: std.mem.Allocator, writer: anytype) !void {
+    const exe_path = try getExecutablePath(allocator);
+    defer allocator.free(exe_path);
+
+    try writer.print(
+        \\# Pure prompt initialization for bash
+        \\
+        \\# Pre-command: show directory and git branch
+        \\pure_precmd() {{
+        \\    "{s}" precmd
+        \\}}
+        \\
+        \\# Prompt symbol with color based on status
+        \\pure_prompt() {{
+        \\    local ret=$?
+        \\    local keymap="${{KEYMAP:-}}"
+        \\    local venv="${{VIRTUAL_ENV##*/}}"
+        \\    local jobs=$(jobs -p | wc -l | tr -d ' ')
+        \\    "{s}" prompt -r "$ret" -k "$keymap" --venv "$venv" -j "$jobs"
+        \\}}
+        \\
+        \\# Set the prompt
+        \\PS1='$(pure_precmd)$(pure_prompt)'
+        \\
+    , .{ exe_path, exe_path });
+}
+
+fn printZshInit(allocator: std.mem.Allocator, writer: anytype) !void {
+    const exe_path = try getExecutablePath(allocator);
+    defer allocator.free(exe_path);
+
+    try writer.print(
+        \\# Pure prompt initialization for zsh
+        \\
+        \\# Pre-command: show directory and git branch
+        \\pure_precmd() {{
+        \\    "{s}" precmd
+        \\}}
+        \\
+        \\# Prompt symbol with color based on status
+        \\pure_prompt() {{
+        \\    local ret=$?
+        \\    local keymap="${{KEYMAP:-}}"
+        \\    local venv="${{VIRTUAL_ENV:t}}"
+        \\    local jobs=$(jobs -p | wc -l | tr -d ' ')
+        \\    "{s}" prompt -r "$ret" -k "$keymap" --venv "$venv" -j "$jobs"
+        \\}}
+        \\
+        \\# Set the prompt
+        \\setopt PROMPT_SUBST
+        \\PS1='$(pure_precmd)$(pure_prompt)'
+        \\
+    , .{ exe_path, exe_path });
+}
+
+fn printFishInit(allocator: std.mem.Allocator, writer: anytype) !void {
+    const exe_path = try getExecutablePath(allocator);
+    defer allocator.free(exe_path);
+
+    try writer.print(
+        \\# Pure prompt initialization for fish
+        \\
+        \\# Pre-command: show directory and git branch
+        \\function pure_precmd
+        \\    "{s}" precmd
+        \\end
+        \\
+        \\# Prompt symbol with color based on status
+        \\function pure_prompt
+        \\    set -l ret $status
+        \\    set -l keymap ""
+        \\    set -l venv (string replace -r '.*/' '' -- "$VIRTUAL_ENV" 2>/dev/null; or echo "")
+        \\    set -l jobs (count (jobs -p))
+        \\    "{s}" prompt -r "$ret" -k "$keymap" --venv "$venv" -j "$jobs"
+        \\end
+        \\
+        \\# Set the prompt
+        \\function fish_prompt
+        \\    pure_precmd
+        \\    pure_prompt
+        \\end
+        \\
+    , .{ exe_path, exe_path });
+}
+
 fn printUsage(writer: anytype) !void {
     try writer.print(
         \\Pure - Pure-inspired prompt in Zig
         \\
         \\Usage:
-        \\  pure prompt -r <return_code> -k <keymap> [--venv <name>] [-j <job_count>]
-        \\  pure precmd [--git-detailed]
+        \\  pure init <shell>     Generate shell init script (bash|zsh|fish)
         \\
         \\Commands:
-        \\  prompt    Generate the prompt line
-        \\  precmd    Generate the pre-command line (directory + git status)
+        \\  init      Generate shell initialization script
         \\
         \\Options:
-        \\  prompt:
-        \\    -r, --last-return-code  Last command return code
-        \\    -k, --keymap            Vi keymap (vicmd for command mode)
-        \\    --venv                  Python virtual environment name
-        \\    -j, --jobs              Number of background jobs
-        \\  precmd:
-        \\    -d, --git-detailed      Show detailed git status
+        \\  init:
+        \\    <shell>              Shell type: bash, zsh, or fish
+        \\
+        \\Note: precmd and prompt are internal commands used by the generated init.
         \\
     , .{});
 }
@@ -350,14 +437,30 @@ pub fn main() !void {
     const command = args[1];
     var arg_idx: usize = 2;
 
-    if (std.mem.eql(u8, command, "precmd")) {
-        var detailed = false;
-        while (arg_idx < args.len) : (arg_idx += 1) {
-            if (std.mem.eql(u8, args[arg_idx], "--git-detailed") or std.mem.eql(u8, args[arg_idx], "-d")) {
-                detailed = true;
-            }
+    if (std.mem.eql(u8, command, "init")) {
+        if (args.len < 3) {
+            const stderr = std.fs.File.stderr().deprecatedWriter();
+            try stderr.print("Error: shell type required\n\n", .{});
+            try printUsage(std.fs.File.stdout().deprecatedWriter());
+            std.process.exit(1);
         }
-        try precmdCommand(allocator, detailed);
+        const shell = args[2];
+        const stdout = std.fs.File.stdout().deprecatedWriter();
+
+        if (std.mem.eql(u8, shell, "bash")) {
+            try printBashInit(allocator, stdout);
+        } else if (std.mem.eql(u8, shell, "zsh")) {
+            try printZshInit(allocator, stdout);
+        } else if (std.mem.eql(u8, shell, "fish")) {
+            try printFishInit(allocator, stdout);
+        } else {
+            const stderr = std.fs.File.stderr().deprecatedWriter();
+            try stderr.print("Error: unsupported shell '{s}'. Supported shells: bash, zsh, fish\n\n", .{shell});
+            try printUsage(std.fs.File.stdout().deprecatedWriter());
+            std.process.exit(1);
+        }
+    } else if (std.mem.eql(u8, command, "precmd")) {
+        try precmdCommand(allocator, true);
     } else if (std.mem.eql(u8, command, "prompt")) {
         var last_return_code: []const u8 = "0";
         var keymap: []const u8 = "US";

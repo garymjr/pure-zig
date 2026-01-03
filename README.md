@@ -7,69 +7,49 @@ Even more minimal, definitively faster and at least as pretty as the original Pu
 ## Installation — Usage
 
 1. Set up your Zig environment (0.11.0 or later)
-1. `$ zig build -Doptimize=ReleaseSafe`
+2. `$ zig build -Doptimize=ReleaseSafe`
+3. Add the appropriate init to your shell config:
 
 ### ZSH
 
-Add the following to your `~/.zshrc`:
-
 ```zsh
-# Enable vi mode
-bindkey -v
+# Add to ~/.zshrc
+eval "$(zig-out/bin/pure init zsh)"
+```
 
-function zle-line-init zle-keymap-select {
-  PROMPT=`/PATH/TO/PURE-ZIG/zig-out/bin/pure prompt -k "$KEYMAP" -r "$?" --venv "${${VIRTUAL_ENV:t}%-*}"`
-  zle reset-prompt
-}
-zle -N zle-line-init
-zle -N zle-keymap-select
+### Bash
 
-autoload -Uz add-zsh-hook
-
-function _prompt_pure_precmd() {
-  /PATH/TO/PURE-ZIG/zig-out/bin/pure precmd
-}
-add-zsh-hook precmd _prompt_pure_precmd
+```bash
+# Add to ~/.bashrc
+eval "$(zig-out/bin/pure init bash)"
 ```
 
 ### Fish
 
-Add the following to your `~/.config/fish/config.fish`:
-
 ```fish
-# Enable vi mode
+# Add to ~/.config/fish/config.fish
+zig-out/bin/pure init fish | source
+```
+
+**Note:** The init command generates shell configuration that embeds the full path to the `pure` binary. If you move the binary, you'll need to re-run the init command.
+
+### Optional: Vi Mode
+
+For vi mode indication in the prompt, enable vi bindings in your shell:
+
+**ZSH:**
+```zsh
+bindkey -v
+```
+
+**Bash:**
+```bash
+set -o vi
+```
+
+**Fish:**
+```fish
 fish_vi_key_bindings
-
-set -x PURE_ZIG_PATH /PATH/TO/PURE-ZIG/zig-out/bin/pure
-
-function fish_prompt
-  set -l last_status $status
-  set -l venv_name ""
-
-  if set -q VIRTUAL_ENV
-    set venv_name (basename $VIRTUAL_ENV)
-    # Strip version suffix if present (e.g., "myenv-3.11" -> "myenv")
-    set venv_name (string replace -r '-.*' '' $venv_name)
-  end
-
-  # Map fish bind modes to pure-zig keymap names
-  # In fish vi mode: "default" = normal mode, "insert" = insert mode
-  set -l keymap $fish_bind_mode
-  if test "$keymap" != "insert"
-    set keymap "vicmd"
-  end
-
-  $PURE_ZIG_PATH prompt -r "$last_status" -k "$keymap" --venv "$venv_name"
-end
-
-function _pure_fish_prompt --on-event fish_prompt
-  $PURE_ZIG_PATH precmd
-end
-
-# Hide default mode prompt
-function fish_mode_prompt
-  # Return empty to hide default mode indicator
-end
 ```
 
 ## Features
@@ -94,14 +74,10 @@ zig build -Doptimize=ReleaseSafe
 ## Running
 
 ```bash
-# Show precmd (directory + git status)
-zig-out/bin/pure precmd
-
-# Show precmd with detailed git status
-zig-out/bin/pure precmd --git-detailed
-
-# Show prompt
-zig-out/bin/pure prompt -k "vicmd" -r "0" --venv "myenv"
+# Generate and source shell init script
+eval "$(zig-out/bin/pure init bash)"
+eval "$(zig-out/bin/pure init zsh)"
+zig-out/bin/pure init fish | source
 ```
 
 ## Why?
