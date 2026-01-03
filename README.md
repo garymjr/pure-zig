@@ -98,8 +98,7 @@ zig-out/bin/pure prompt -k "vicmd" -r "0" --venv "myenv"
 ## Why?
 
 1. Learn Zig
-2. Create an even faster pure prompt than the Rust version
-3. Demonstrate Zig's capabilities for systems programming
+2. Learn to work with AI
 
 ## License
 
