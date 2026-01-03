@@ -4,360 +4,392 @@ Pure-Zig - Pure-inspired prompt written in Zig.
 
 ## Build / Lint / Test Commands
 
-### Build
 ```bash
-# Debug build
-zig build
+# Build
+just build                    # Debug
+just build-release            # ReleaseSafe (production)
+just build-fast               # ReleaseFast
+just build-small              # ReleaseSmall
 
-# Release build (recommended for production)
-zig build -Doptimize=ReleaseSafe
+# Run
+just run                      # Debug build
+just run-args arg1 arg2       # With args
+just run-release              # Release build
 
-# Other release modes
-zig build -Doptimize=ReleaseFast    # Fastest runtime, slower compile
-zig build -Doptimize=ReleaseSmall   # Smallest binary size
-zig build -Doptimize=Debug          # Debug info, no optimizations
+# Test
+just test                     # All tests
+just test-verbose             # Verbose
+just check                    # fmt-check + test
+
+# Format
+just fmt                      # Format code
+just fmt-check                # Check formatting
+
+# Clean / Rebuild
+just clean                    # Clean artifacts
+just rebuild                  # clean + build-release + test
+
+# Install / Uninstall
+just install                  # Install to ~/.local/bin/pure
+just uninstall                # Uninstall
+
+# Info
+just info                     # Version info
+just --list                   # All recipes
 ```
 
-### Run
-```bash
-# Build and run
-zig build run
+### Build Config
 
-# Run with arguments
-zig build run -- args...
+**build.zig**: `b.standardTargetOptions()`, `b.standardOptimizeOption()`, `b.addExecutable()`, run/test steps
 
-# Run the built binary directly
-./zig-out/bin/pure
-```
+**justfile**: Preferred workflow. Install: `brew install just` (macOS) or `cargo install just` (Linux)
 
-### Test
-```bash
-# Run all tests
-zig build test
+**Artifacts**:
+- `zig-out/bin/pure` - Binary
+- `zig-cache/`, `.zig-cache/` - Cache (gitignored)
 
-# Run tests for specific file (add test block in that file)
-zig test src/main.zig
+## Code Style
 
-# Run tests with verbose output
-zig test src/main.zig --summary all
-
-# Run tests with release optimizations
-zig test src/main.zig -Doptimize=ReleaseFast
-```
-
-### Lint / Format
-```bash
-# Format code (standard Zig formatter)
-zig fmt src/
-
-# Check what would be formatted (dry run)
-zig fmt --check src/
-
-# Format a specific file
-zig fmt src/main.zig
-```
-
-## Code Style Guidelines
-
-### Zig Version
-- Minimum Zig version: 0.11.0 (currently using 0.15.2)
-- Update `README.md` if minimum version changes
+### Version
+- Current: 0.15.2 (verify with `zig version`)
+- Minimum: 0.11.0 (README.md)
 
 ### Module System
-- Use `const std = @import("std");` as standard library import
-- Import specific modules for clarity: `const array_list = std.array_list;`
-- No file extensions in imports - use `@import("src/main.zig")` pattern
-
-### Naming Conventions
-
-**Variables/Functions:** `camelCase`
 ```zig
-const myVariable = 42;
-const shortPath = try shortenPath(allocator, cwd);
-fn promptCommand(allocator: std.mem.Allocator, ...) !void { }
+const std = @import("std");
+const array_list = std.array_list;
+// No file extensions: @import("src/main.zig")
 ```
 
-**Constants (compile-time):** `UPPER_SNAKE_CASE`
-```zig
-const INSERT_SYMBOL = "❯";
-const NORMAL_SYMBOL = "❮";
-const NORMAL_KEYMAP = "vicmd";
-```
+### Naming
+- Variables/Functions: `camelCase`
+- Constants: `UPPER_SNAKE_CASE`
+- Types: `PascalCase`
+- Enums: PascalCase enum, UPPER_SNAKE_CASE values (or descriptive camelCase)
 
-**Types:** `PascalCase`
-```zig
-const Color = enum { ... };
-const GitStatus = struct { ... };
-```
-
-**Enums:** PascalCase enum, UPPER_SNAKE_CASE values (or descriptive camelCase)
-```zig
-const Color = enum {
-    black,
-    red,
-    green,
-    // ...
-};
-```
-
-### Formatting Conventions
-- Use `zig fmt` for formatting - this is the authoritative style
-- 4 space indentation
-- Prefer single quotes for single characters: `'\n'`
-- Double quotes for strings: `"hello"`
+### Formatting
+- `just fmt` (wraps `zig fmt`)
+- 4 space indent
+- Single chars: `'\n'`, strings: `"hello"`
 
 ### Type Usage
-- **Error union return types**: Use `!T` for functions that can fail
 ```zig
-fn getRepoStatus(allocator: std.mem.Allocator, cwd: []const u8) !?GitStatus {
-    // Returns ?GitStatus or error
-}
-```
-
-- **Optionals**: Use `?T` for values that may be null
-```zig
-const branch: ?[]const u8 = null;
-```
-
-- **No explicit type annotations when inferable**:
-```zig
-const symbol = if (condition) NORMAL_SYMBOL else INSERT_SYMBOL;
-// Type inferred to []const u8
-```
-
-- **Explicit types for public API and allocators**:
-```zig
-fn promptCommand(allocator: std.mem.Allocator, ...) !void
+fn getRepoStatus(allocator: std.mem.Allocator, cwd: []const u8) !?GitStatus {}  // Error union
+const branch: ?[]const u8 = null;  // Optional
+const symbol = if (condition) NORMAL_SYMBOL else INSERT_SYMBOL;  // Inferred
+fn promptCommand(allocator: std.mem.Allocator, ...) !void  // Explicit types for API
 ```
 
 ### Memory Management
-- **Allocator pattern**: Pass `std.mem.Allocator` explicitly to allocating functions
-- **Defer cleanup**: Always `defer allocator.free()` for allocations
 ```zig
 const path = try std.fmt.allocPrint(allocator, "{s}/.git", .{repo_path});
 defer allocator.free(path);
-```
-
-- **Owned slices**: Use `toOwnedSlice()` when transferring ownership
-```zig
 const result = try result.toOwnedSlice();
 ```
 
 ### Error Handling
-- **Try propagation**: Use `try` for error propagation
 ```zig
-const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
-```
-
-- **Catch blocks**: Handle specific errors when needed
-```zig
-const git_dir = std.fmt.allocPrint(allocator, "{s}/.git", .{repo_path}) catch return null;
-```
-
-- **Error unions**: Use `errdefer` for cleanup on error paths
-```zig
+const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");  // try propagation
+const git_dir = std.fmt.allocPrint(allocator, "{s}/.git", .{repo_path}) catch return null;  // catch
 var status = GitStatus{ .allocator = allocator };
-errdefer status.deinit();
+errdefer status.deinit();  // errdefer
+// Return errors directly; don't wrap
 ```
 
-- **No error wrapping**: Return errors directly, don't wrap in custom errors unless needed
-
-### Testing Conventions
+### Testing
 ```zig
-test "description of what is tested" {
+test "description" {
     const allocator = std.testing.allocator;
-    // Arrange
     const input = "...";
-
-    // Act
     const result = try functionUnderTest(allocator, input);
     defer allocator.free(result);
-
-    // Assert
     try std.testing.expectEqualStrings("expected", result);
 }
 ```
-
-- Use `std.testing.allocator` to detect memory leaks
-- Clean up allocations in test teardown
-- Test both success and error paths
+- Use `std.testing.allocator` for leak detection
+- Clean up allocations in defer
 
 ### Structs with Cleanup
-- Include `deinit` method for structs owning memory
 ```zig
 const GitStatus = struct {
     branch: ?[]const u8 = null,
     allocator: std.mem.Allocator,
-
     fn deinit(self: *const GitStatus) void {
         if (self.branch) |b| self.allocator.free(b);
     }
 };
 ```
 
-### String Handling
-- Use `[]const u8` for string slices (not null-terminated)
-- Use string literals: `"hello"`
-- Compare with `std.mem.eql(u8, a, b)`, not `==`
-- Trim whitespace: `std.mem.trim(u8, str, &std.ascii.whitespace)`
-- Startswith: `std.mem.startsWith(u8, str, prefix)`
-
-### Enum Usage
-- Enum to int: `@intFromEnum(myEnum)`
-- Int to enum: `@enumFromEnum(myInt)`
-- Use enums for type-safe constants (like ANSI color codes)
-
-### File I/O
+### Config Pattern
 ```zig
-// Open file
+const Config = struct {
+    detailed_git: bool = true,
+    icons: struct {
+        ahead: []const u8 = GIT_ICONS.ahead,
+        behind: []const u8 = GIT_ICONS.behind,
+    } = .{},
+};
+fn readConfigFromEnv(allocator: std.mem.Allocator) !Config {
+    var config = Config{};
+    if (std.process.getEnvVarOwned(allocator, "PURE_DETAILED_GIT")) |val| {
+        defer allocator.free(val);
+        config.detailed_git = std.mem.eql(u8, val, "1");
+    } else |_| {}
+    return config;
+}
+```
+
+### CLI Parsing
+```zig
+const args = try std.process.argsAlloc(allocator);
+defer std.process.argsFree(allocator, args);
+if (args.len < 2) { /* error */ }
+const command = args[1];
+var arg_idx: usize = 2;
+while (arg_idx < args.len) : (arg_idx += 1) {
+    if (std.mem.eql(u8, args[arg_idx], "--flag")) {
+        arg_idx += 1;
+        if (arg_idx < args.len) { /* process value */ }
+    }
+}
+```
+
+### Strings & Files
+```zig
+// Strings: []const u8 slices, not null-terminated
+// Compare: std.mem.eql(u8, a, b), not ==
+// Trim: std.mem.trim(u8, str, &std.ascii.whitespace)
+// Startswith: std.mem.startsWith(u8, str, prefix)
+
+// File I/O
 const file = try std.fs.openFileAbsolute(path, .{});
 defer file.close();
-
-// Read to end
 const content = try file.readToEndAlloc(allocator, max_size);
 defer allocator.free(content);
-
-// Resolve path
 const absolute = try std.fs.path.resolve(allocator, &[_][]const u8{path});
 defer allocator.free(absolute);
+
+// Enums
+@intFromEnum(myEnum)
+@enumFromInt(myInt)
 ```
 
-## Architecture Overview
+## Architecture
 
-### Project Structure
+### Structure
 ```
 pure-zig/
-├── src/
-│   └── main.zig          # Single-file application
-├── build.zig             # Zig build configuration
-├── README.md             # User documentation
-├── LICENSE               # MIT license
-└── AGENTS.md             # This file
+├── src/main.zig    # Single-file (637 lines)
+├── build.zig       # Zig build config
+├── justfile        # Just recipes (preferred)
+├── README.md       # User docs
+├── LICENSE         # MIT
+├── AGENTS.md       # This file
+├── zig-out/        # Build output
+└── zig-cache/      # Cache
 ```
 
 ### Key Abstractions
 
-**Color Enum**: ANSI color code abstraction
-- `fg()` - foreground color
-- `fgBright()` - bright foreground
-- `bg()` - background color
-- `bold()` - bold foreground
+**Color Enum**: ANSI codes. `fg()`, `fgBright()`, `bg()`, `bold()`, global `reset`
 
-**GitStatus**: Git repository state
-- Branch name, ahead/behind counts, file changes
-- Action state (rebase, merge, bisect, etc.)
-- Has `deinit()` for memory cleanup
+**GIT_ICONS**: Default icon constants struct, overridden via Config
 
-**Main Commands**:
-1. `init <shell>` - Generate shell init script (bash/zsh/fish)
-2. `precmd` - Show directory and git status (called by shell)
-3. `prompt` - Show prompt symbol with status (called by shell)
+**Config**: `detailed_git` flag, nested `icons` struct, env var overrides
+
+**GitStatus**: Branch, ahead/behind, changes, action. Has `deinit()`
+
+**Commands**: `init <shell>`, `precmd`, `prompt`
 
 ### Design Patterns
-
-**Allocator-first design**: All allocating functions take an explicit allocator parameter, enabling flexible memory management.
-
-**Result-based error handling**: Uses Zig's error unions (`!T`) and `try` for clean error propagation.
-
-**Minimal dependencies**: Only uses Zig's standard library - no external dependencies.
-
-**Shell integration pattern**: Generates shell functions that call back into the binary with specific commands.
-
-### Output Directories
-- `zig-out/` - Build output directory (binaries)
-- `zig-cache/` - Build cache (don't commit)
-- `.zig-cache/` - Alternative cache location (don't commit)
+- Allocator-first: explicit `std.mem.Allocator` params
+- Error unions (`!T`) + `try`
+- No external deps: std lib only
+- Shell integration: generate functions calling binary
 
 ### Important Patterns
-
-**String allocation**: Always pair `allocPrint` or `dupe` with `defer allocator.free()`
-
-**Path handling**: Use `std.fs.path` utilities, resolve absolute paths before use
-
-**Shell integration**: Binary path is embedded in generated init scripts via `std.fs.selfExePathAlloc()`
-
-**Exit codes**: Use `std.process.exit(1)` for errors in `main()` after printing to stderr
+- String allocation: `allocPrint`/`dupe` + `defer allocator.free()`
+- Path: `std.fs.path`, resolve absolute first
+- Shell init: binary path via `std.fs.selfExePathAlloc()`
+- Exit: `std.process.exit(1)` after stderr
+- Shell generation: `print{Shell}Init()`, `getExecutablePath()`, functions call back:
+  - `pure_precmd()` → `pure precmd`
+  - `pure_prompt()` → `pure prompt -r $? -k $KEYMAP --venv $venv -j $jobs`
+- Git detection: `findGitRepo()` walks tree for `.git`
+- Output: `std.fs.File.stdout().deprecatedWriter()`, stderr same
+- Array lists: `std.array_list.AlignedManaged` with allocator
+- Testing: inline/module test blocks, `just test`, `std.testing.allocator`
 
 ## Development Workflow
 
-### Setting Up
 ```bash
-# Clone and build
 git clone <repo>
 cd pure-zig
-zig build -Doptimize=ReleaseSafe
-
-# Test in your shell (e.g., zsh)
-eval "$(zig-out/bin/pure init zsh)"
+just build-release
+eval "$(./zig-out/bin/pure init zsh)"
 ```
 
-### Making Changes
-1. Edit source in `src/main.zig`
-2. Format: `zig fmt src/`
-3. Build: `zig build`
-4. Test: `zig build test` (add tests as you go)
-5. Manual test: `eval "$(zig-out/bin/pure init zsh)"` and try it
+### Changes
+1. Edit `src/main.zig`
+2. `just fmt`
+3. `just build`
+4. `just test` (add tests)
+5. `eval "$(./zig-out/bin/pure init zsh)"` to verify
+
+### Single-File Notes
+- All in `src/main.zig` (637 lines)
+- Split if >500 lines:
+  - `src/config.zig`: Config, GIT_ICONS, readConfigFromEnv
+  - `src/color.zig`: Color enum, ANSI codes
+  - `src/git.zig`: GitStatus, findGitRepo, getRepoStatus, formatGitStatus
+  - `src/shell.zig`: print{Bash,Zsh,Fish}Init
+  - `src/path.zig`: shortenPath
+  - `src/main.zig`: main, promptCommand, precmdCommand
+- `@import("src/config")` - no extensions
 
 ### Adding Features
-- Follow existing patterns (enum for colors, struct for state)
-- Add deinit() to structs that own memory
-- Add error handling with try/catch
-- Document in README.md if user-facing
+- Follow patterns (enum colors, struct state)
+- Add `deinit()` to structs owning memory
+- Handle errors with try/catch
+- User-facing: document in README.md
 
 ## Extension Points
 
-### Adding Shell Support
-1. Add shell detection in `main()`
-2. Create `print{Shell}Init()` function
-3. Update README.md with usage instructions
+### Add Shell Support
+1. Shell detection in `main()`
+2. `print{Shell}Init()` function
+3. `pure_precmd()`, `pure_prompt()` functions
+4. Hooks for integration
+5. Update README.md
+6. Add justfile recipe
 
-### Adding Git Status Features
-- Extend `GitStatus` struct with new fields
-- Update `countGitStatus()` implementation (currently stubbed)
-- Update `formatGitStatus()` to display new info
+### Add Git Features
+- Extend `GitStatus` struct
+- Add cleanup in `deinit()`
+- Update `countGitStatus()`/related
+- Update `formatGitStatus()`
+- Add tests
 
-### Customizing Prompt Symbols
-- Modify `INSERT_SYMBOL`, `NORMAL_SYMBOL`, `JOB_SYMBOL` constants
-- Colors controlled in `promptCommand()` shell_color logic
+### Custom Prompt Symbols
+- Modify `INSERT_SYMBOL`, `NORMAL_SYMBOL`, `JOB_SYMBOL`
+- Colors in `promptCommand()` shell_color logic
+- Add env vars for new symbols
 
 ### New Features
-- Add commands to `main()` command dispatcher
-- Create dedicated functions following `promptCommand()` / `precmdCommand()` pattern
-- Update `printUsage()` for help text
+- Add command to `main()` dispatcher
+- Create function following `promptCommand()`/`precmdCommand()` pattern
+- Update `printUsage()`
+- Add Config fields
+- Update `readConfigFromEnv()`
+- Add tests
 
 ## Dependencies
 
-**Zig Standard Library**:
-- `std.mem` - String operations, comparisons, allocation
-- `std.fs` - File system operations, paths
-- `std.process` - Process info, arguments, environment
-- `std.fmt` - Formatting and printing
-- `std.testing` - Test framework
-- `std.ascii` - ASCII character classification
-- `std.array_list` - Dynamic arrays
-- `std.heap.page_allocator` - Default allocator
+**Zig std lib only**:
+- `std.mem` - strings, comparisons, allocation
+- `std.fs` - filesystem, paths
+- `std.process` - process, args, env
+- `std.fmt` - formatting, printing
+- `std.testing` - test framework
+- `std.ascii` - ASCII classification
+- `std.array_list` - dynamic arrays
+- `std.heap.page_allocator` - default allocator
 
-**No external dependencies** - Pure Zig, all standard library.
+## Pitfalls
 
-## Shell Integration Details
+### Memory
+- Always pair allocations with `defer allocator.free()`
+- `toOwnedSlice()` only for ownership transfer
+- Use `std.heap.page_allocator` in main, `std.testing.allocator` in tests
+- Array lists: `deinit` + free items in defer blocks
 
-### Communication Pattern
-Shell → Binary (via function calls):
-1. `precmd` command: prints directory + git status on newline
-2. `prompt` command: prints colored prompt symbol
+### Errors
+- Use `try`, `catch`, `orelse` - don't silently ignore
+- `errdefer` for cleanup on error paths
+- Return errors directly; don't wrap
 
-### Environment Variables Used
-- `HOME` - User home directory for path shortening
-- `VIRTUAL_ENV` - Python virtual environment path
-- `KEYMAP` (zsh) - Current keymap (vicmd = normal mode)
+### Strings
+- Check bounds before slice indexing
+- Compare with `std.mem.eql(u8, a, b)`, not `==`
+- Check `.len > 0` for emptiness, not `!= null`
+- Trim: `std.mem.trim(u8, str, &std.ascii.whitespace)`
 
-### Shell Functions Generated
-Each init script generates:
-- `pure_precmd()` - Calls `pure precmd`
-- `pure_prompt()` - Calls `pure prompt -r $? -k $KEYMAP --venv $venv -j $jobs`
+### CLI Parsing
+- Check `arg_idx < args.len` before access
+- Increment index after checking bounds for flag values
+- Provide defaults for optional args
+- Print usage on invalid input
+
+### Git
+- Not in git repo: return null/empty status
+- Detached HEAD: show short commit hash
+- Missing .git files: handle gracefully
+- Resolve absolute paths before .git check
+
+### Shell
+- Re-run init if binary moves
+- Env vars may not be set - use catch blocks
+- Vi mode: check for "vicmd" keymap
+- Different shells = different syntax
+
+### File I/O
+- `defer file.close()`
+- Handle file operation errors
+- `resolve()` before absolute path ops
+- Set reasonable limits for `readToEndAlloc()`
+
+## Testing
+
+### Current State
+- No tests exist
+- Add tests with new features
+- `just test` runs all
+- `just test-verbose` for verbose
+
+### Placement
+- Inline after functions
+- Module-level for integration
+```zig
+test "shortenPath should replace home directory with ~" {
+    const allocator = std.testing.allocator;
+    const home = try std.process.getEnvVarOwned(allocator, "HOME");
+    defer allocator.free(home);
+    const test_path = try std.fmt.allocPrint(allocator, "{s}/Projects/foo", .{home});
+    defer allocator.free(test_path);
+    const result = try shortenPath(allocator, test_path);
+    defer allocator.free(result);
+    try std.testing.expectEqualStrings("~/Projects/foo", result);
+}
+```
+
+### Memory Leak Testing
+- `std.testing.allocator` detects leaks
+- All test allocations use this allocator
+- Tests fail on leaks
+
+### Specific Tests
+- `zig test src/main.zig --filter "test name"`
+
+## Shell Integration
+
+### Communication
+Shell → Binary via function calls:
+1. `precmd`: directory + git status
+2. `prompt`: colored prompt symbol
+
+### Environment Variables
+- `HOME` - path shortening
+- `VIRTUAL_ENV` - Python venv
+- `KEYMAP` - current keymap (vicmd = normal)
+- `PURE_DETAILED_GIT` - detailed git ("1" or "true")
+- `PURE_ICON_AHEAD` / `BEHIND` / `CLEAN` / `STAGED` / `CONFLICTED` / `MODIFIED` / `UNTRACKED` - custom icons
+
+### Generated Functions
+- `pure_precmd()` → `pure precmd`
+- `pure_prompt()` → `pure prompt -r $? -k $KEYMAP --venv $venv -j $jobs`
 
 ### Vi Mode
 - zsh: `bindkey -v`
 - bash: `set -o vi`
 - fish: `fish_vi_key_bindings`
-- Detected via `keymap` argument ("vicmd" = normal mode)
+- Detected via `keymap == "vicmd"`
