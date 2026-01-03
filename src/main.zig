@@ -4,6 +4,7 @@ const array_list = std.array_list;
 const ARROW_SYMBOL = "➜";
 const INSERT_SYMBOL = "❯";
 const COMMAND_SYMBOL = "⬢";
+const JOB_SYMBOL = "●";
 const COMMAND_KEYMAP = "vicmd";
 
 const Color = enum {
@@ -51,7 +52,7 @@ const Color = enum {
 
 const reset = "\x1b[0m";
 
-fn promptCommand(allocator: std.mem.Allocator, last_return_code: []const u8, keymap: []const u8, venv_name: []const u8) !void {
+fn promptCommand(allocator: std.mem.Allocator, last_return_code: []const u8, keymap: []const u8, venv_name: []const u8, job_count: usize) !void {
     const symbol = if (std.mem.eql(u8, keymap, COMMAND_KEYMAP)) COMMAND_SYMBOL else INSERT_SYMBOL;
 
     const shell_color: Color = blk: {
@@ -67,8 +68,15 @@ fn promptCommand(allocator: std.mem.Allocator, last_return_code: []const u8, key
 
     defer if (venv.len > 0) allocator.free(venv);
 
+    const jobs = if (job_count > 0)
+        try std.fmt.allocPrint(allocator, "{s}{s}{d}{s} ", .{ Color.fgBright(Color.yellow), JOB_SYMBOL, job_count, reset })
+    else
+        "";
+
+    defer if (jobs.len > 0) allocator.free(jobs);
+
     const stdout = std.fs.File.stdout().deprecatedWriter();
-    try stdout.print("{s}{s}{s}{s} ", .{ venv, Color.fgBright(shell_color), symbol, reset });
+    try stdout.print("{s}{s}{s}{s}{s} ", .{ venv, jobs, Color.fgBright(shell_color), symbol, reset });
 }
 
 fn shortenPath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -311,7 +319,7 @@ fn printUsage(writer: anytype) !void {
         \\Pure - Pure-inspired prompt in Zig
         \\
         \\Usage:
-        \\  pure prompt -r <return_code> -k <keymap> [--venv <name>]
+        \\  pure prompt -r <return_code> -k <keymap> [--venv <name>] [-j <job_count>]
         \\  pure precmd [--git-detailed]
         \\
         \\Commands:
@@ -323,6 +331,7 @@ fn printUsage(writer: anytype) !void {
         \\    -r, --last-return-code  Last command return code
         \\    -k, --keymap            Vi keymap (vicmd for command mode)
         \\    --venv                  Python virtual environment name
+        \\    -j, --jobs              Number of background jobs
         \\  precmd:
         \\    -d, --git-detailed      Show detailed git status
         \\
@@ -354,6 +363,7 @@ pub fn main() !void {
         var last_return_code: []const u8 = "0";
         var keymap: []const u8 = "US";
         var venv_name: []const u8 = "";
+        var job_count: usize = 0;
 
         while (arg_idx < args.len) : (arg_idx += 1) {
             if (std.mem.eql(u8, args[arg_idx], "-r") or std.mem.eql(u8, args[arg_idx], "--last-return-code")) {
@@ -365,9 +375,12 @@ pub fn main() !void {
             } else if (std.mem.eql(u8, args[arg_idx], "--venv")) {
                 arg_idx += 1;
                 if (arg_idx < args.len) venv_name = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "-j") or std.mem.eql(u8, args[arg_idx], "--jobs")) {
+                arg_idx += 1;
+                if (arg_idx < args.len) job_count = std.fmt.parseInt(usize, args[arg_idx], 10) catch 0;
             }
         }
-        try promptCommand(allocator, last_return_code, keymap, venv_name);
+        try promptCommand(allocator, last_return_code, keymap, venv_name, job_count);
     } else if (std.mem.eql(u8, command, "help") or std.mem.eql(u8, command, "-h") or std.mem.eql(u8, command, "--help")) {
         try printUsage(std.fs.File.stdout().deprecatedWriter());
     } else {
