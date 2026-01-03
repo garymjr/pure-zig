@@ -6,6 +6,32 @@ const NORMAL_SYMBOL = "❮";
 const JOB_SYMBOL = "●";
 const NORMAL_KEYMAP = "vicmd";
 
+// Default git icons
+const GIT_ICONS = struct {
+    const ahead = "↑";
+    const behind = "↓";
+    const clean = "✔";
+    const staged = "♦";
+    const conflicted = "✖";
+    const modified = "✚";
+    const untracked = "…";
+    const dirty = "*";
+    const separator = " ";
+};
+
+const Config = struct {
+    detailed_git: bool = true,
+    icons: struct {
+        ahead: []const u8 = GIT_ICONS.ahead,
+        behind: []const u8 = GIT_ICONS.behind,
+        clean: []const u8 = GIT_ICONS.clean,
+        staged: []const u8 = GIT_ICONS.staged,
+        conflicted: []const u8 = GIT_ICONS.conflicted,
+        modified: []const u8 = GIT_ICONS.modified,
+        untracked: []const u8 = GIT_ICONS.untracked,
+    } = .{},
+};
+
 const Color = enum {
     black,
     red,
@@ -218,7 +244,7 @@ fn countGitStatus(allocator: std.mem.Allocator, git_dir: []const u8) !struct { i
     return .{ 0, 0, 0, 0 };
 }
 
-fn getRepoStatus(allocator: std.mem.Allocator, cwd: []const u8, detailed: bool) !?GitStatus {
+fn getRepoStatus(allocator: std.mem.Allocator, cwd: []const u8, config: Config) !?GitStatus {
     const repo_path = findGitRepo(cwd) orelse return null;
     const git_dir = try std.fmt.allocPrint(allocator, "{s}/.git", .{repo_path});
     defer allocator.free(git_dir);
@@ -228,14 +254,14 @@ fn getRepoStatus(allocator: std.mem.Allocator, cwd: []const u8, detailed: bool) 
 
     status.branch = getHeadShortname(allocator, git_dir) catch null;
 
-    if (detailed) {
+    if (config.detailed_git) {
         status.action = getGitAction(allocator, git_dir) catch null;
     }
 
     return status;
 }
 
-fn formatGitStatus(allocator: std.mem.Allocator, status: GitStatus, detailed: bool) ![]const u8 {
+fn formatGitStatus(allocator: std.mem.Allocator, status: GitStatus, config: Config) ![]const u8 {
     const PartsList = array_list.AlignedManaged([]const u8, null);
     var parts = PartsList.init(allocator);
     defer {
@@ -247,53 +273,53 @@ fn formatGitStatus(allocator: std.mem.Allocator, status: GitStatus, detailed: bo
         try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ Color.fg(Color.cyan), branch, reset }));
     }
 
-    if (!detailed) {
+    if (!config.detailed_git) {
         const has_changes = status.index_changes > 0 or status.wt_changes > 0 or status.conflicted > 0 or status.untracked > 0;
         if (has_changes) {
-            try parts.append(try std.fmt.allocPrint(allocator, "{s}*{s}", .{ Color.bold(Color.red), reset }));
+            try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ Color.bold(Color.red), config.icons.conflicted, reset }));
         }
     } else {
         if (status.ahead > 0) {
-            try parts.append(try std.fmt.allocPrint(allocator, "{s}↑{d}{s}", .{ Color.fg(Color.cyan), status.ahead, reset }));
+            try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{d}{s}", .{ Color.fg(Color.cyan), config.icons.ahead, status.ahead, reset }));
         }
         if (status.behind > 0) {
-            try parts.append(try std.fmt.allocPrint(allocator, "{s}↓{d}{s}", .{ Color.fg(Color.cyan), status.behind, reset }));
+            try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{d}{s}", .{ Color.fg(Color.cyan), config.icons.behind, status.behind, reset }));
         }
 
         const clean = status.index_changes == 0 and status.wt_changes == 0 and status.conflicted == 0 and status.untracked == 0;
         if (clean) {
-            try parts.append(try std.fmt.allocPrint(allocator, "{s}✔{s}", .{ Color.fg(Color.green), reset }));
+            try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ Color.fg(Color.green), config.icons.clean, reset }));
         } else {
             if (status.index_changes > 0) {
-                try parts.append(try std.fmt.allocPrint(allocator, "{s}♦{d}{s}", .{ Color.fg(Color.green), status.index_changes, reset }));
+                try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{d}{s}", .{ Color.fg(Color.green), config.icons.staged, status.index_changes, reset }));
             }
             if (status.conflicted > 0) {
-                try parts.append(try std.fmt.allocPrint(allocator, "{s}✖{d}{s}", .{ Color.fg(Color.red), status.conflicted, reset }));
+                try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{d}{s}", .{ Color.fg(Color.red), config.icons.conflicted, status.conflicted, reset }));
             }
             if (status.wt_changes > 0) {
-                try parts.append(try std.fmt.allocPrint(allocator, "✚{d}", .{status.wt_changes}));
+                try parts.append(try std.fmt.allocPrint(allocator, "{s}{d}", .{ config.icons.modified, status.wt_changes }));
             }
             if (status.untracked > 0) {
-                try parts.append(try allocator.dupe(u8, "…"));
+                try parts.append(try allocator.dupe(u8, config.icons.untracked));
             }
         }
 
         if (status.action) |action| {
-            try parts.append(try std.fmt.allocPrint(allocator, " {s}{s}{s}", .{ Color.fg(Color.magenta), action, reset }));
+            try parts.append(try std.fmt.allocPrint(allocator, "{s}{s}{s}{s}", .{ GIT_ICONS.separator, Color.fg(Color.magenta), action, reset }));
         }
     }
 
     const ResultList = array_list.AlignedManaged(u8, null);
     var result = ResultList.init(allocator);
     for (parts.items, 0..) |part, i| {
-        if (i > 0) try result.append(' ');
+        if (i > 0) try result.appendSlice(GIT_ICONS.separator);
         try result.appendSlice(part);
     }
 
     return result.toOwnedSlice();
 }
 
-fn precmdCommand(allocator: std.mem.Allocator, detailed: bool) !void {
+fn precmdCommand(allocator: std.mem.Allocator, config: Config) !void {
     const cwd = try std.fs.cwd().realpathAlloc(allocator, ".");
     defer allocator.free(cwd);
 
@@ -303,9 +329,9 @@ fn precmdCommand(allocator: std.mem.Allocator, detailed: bool) !void {
     const stdout = std.fs.File.stdout().deprecatedWriter();
     try stdout.print("\n{s}{s}{s}", .{ Color.fg(Color.blue), short_path, reset });
 
-    if (try getRepoStatus(allocator, cwd, detailed)) |status| {
+    if (try getRepoStatus(allocator, cwd, config)) |status| {
         defer status.deinit();
-        const status_str = try formatGitStatus(allocator, status, detailed);
+        const status_str = try formatGitStatus(allocator, status, config);
         defer allocator.free(status_str);
         if (status_str.len > 0) {
             try stdout.print(" {s}", .{status_str});
@@ -315,17 +341,58 @@ fn precmdCommand(allocator: std.mem.Allocator, detailed: bool) !void {
     try stdout.print("\n", .{});
 }
 
+fn readConfigFromEnv(allocator: std.mem.Allocator) !Config {
+    var config = Config{};
+
+    // Read detailed flag
+    if (std.process.getEnvVarOwned(allocator, "PURE_DETAILED_GIT")) |val| {
+        defer allocator.free(val);
+        config.detailed_git = std.mem.eql(u8, val, "1") or std.mem.eql(u8, val, "true");
+    } else |_| {}
+
+    // Read custom icons from environment
+    const icon_vars = [_]struct { []const u8, *[]const u8 }{
+        .{ "PURE_ICON_AHEAD", &config.icons.ahead },
+        .{ "PURE_ICON_BEHIND", &config.icons.behind },
+        .{ "PURE_ICON_CLEAN", &config.icons.clean },
+        .{ "PURE_ICON_STAGED", &config.icons.staged },
+        .{ "PURE_ICON_CONFLICTED", &config.icons.conflicted },
+        .{ "PURE_ICON_MODIFIED", &config.icons.modified },
+        .{ "PURE_ICON_UNTRACKED", &config.icons.untracked },
+    };
+
+    for (icon_vars) |icon_var| {
+        if (std.process.getEnvVarOwned(allocator, icon_var[0])) |val| {
+            icon_var[1].* = val;
+        } else |_| {}
+    }
+
+    return config;
+}
+
 fn getExecutablePath(allocator: std.mem.Allocator) ![]const u8 {
     const self_path = try std.fs.selfExePathAlloc(allocator);
     return self_path;
 }
 
-fn printBashInit(allocator: std.mem.Allocator, writer: anytype) !void {
+fn printBashInit(allocator: std.mem.Allocator, writer: anytype, config: Config) !void {
     const exe_path = try getExecutablePath(allocator);
     defer allocator.free(exe_path);
 
+    const detailed_val = if (config.detailed_git) "1" else "0";
+
     try writer.print(
         \\# Pure prompt initialization for bash
+        \\
+        \\# Configuration
+        \\export PURE_DETAILED_GIT="{s}"
+        \\export PURE_ICON_AHEAD="{s}"
+        \\export PURE_ICON_BEHIND="{s}"
+        \\export PURE_ICON_CLEAN="{s}"
+        \\export PURE_ICON_STAGED="{s}"
+        \\export PURE_ICON_CONFLICTED="{s}"
+        \\export PURE_ICON_MODIFIED="{s}"
+        \\export PURE_ICON_UNTRACKED="{s}"
         \\
         \\# Pre-command: show directory and git branch
         \\pure_precmd() {{
@@ -344,15 +411,27 @@ fn printBashInit(allocator: std.mem.Allocator, writer: anytype) !void {
         \\# Set the prompt
         \\PS1='$(pure_precmd)$(pure_prompt)'
         \\
-    , .{ exe_path, exe_path });
+    , .{ detailed_val, config.icons.ahead, config.icons.behind, config.icons.clean, config.icons.staged, config.icons.conflicted, config.icons.modified, config.icons.untracked, exe_path, exe_path });
 }
 
-fn printZshInit(allocator: std.mem.Allocator, writer: anytype) !void {
+fn printZshInit(allocator: std.mem.Allocator, writer: anytype, config: Config) !void {
     const exe_path = try getExecutablePath(allocator);
     defer allocator.free(exe_path);
 
+    const detailed_val = if (config.detailed_git) "1" else "0";
+
     try writer.print(
         \\# Pure prompt initialization for zsh
+        \\
+        \\# Configuration
+        \\export PURE_DETAILED_GIT="{s}"
+        \\export PURE_ICON_AHEAD="{s}"
+        \\export PURE_ICON_BEHIND="{s}"
+        \\export PURE_ICON_CLEAN="{s}"
+        \\export PURE_ICON_STAGED="{s}"
+        \\export PURE_ICON_CONFLICTED="{s}"
+        \\export PURE_ICON_MODIFIED="{s}"
+        \\export PURE_ICON_UNTRACKED="{s}"
         \\
         \\# Pre-command: show directory and git branch
         \\pure_precmd() {{
@@ -372,15 +451,27 @@ fn printZshInit(allocator: std.mem.Allocator, writer: anytype) !void {
         \\setopt PROMPT_SUBST
         \\PS1='$(pure_precmd)$(pure_prompt)'
         \\
-    , .{ exe_path, exe_path });
+    , .{ detailed_val, config.icons.ahead, config.icons.behind, config.icons.clean, config.icons.staged, config.icons.conflicted, config.icons.modified, config.icons.untracked, exe_path, exe_path });
 }
 
-fn printFishInit(allocator: std.mem.Allocator, writer: anytype) !void {
+fn printFishInit(allocator: std.mem.Allocator, writer: anytype, config: Config) !void {
     const exe_path = try getExecutablePath(allocator);
     defer allocator.free(exe_path);
 
+    const detailed_val = if (config.detailed_git) "1" else "0";
+
     try writer.print(
         \\# Pure prompt initialization for fish
+        \\
+        \\# Configuration
+        \\set -gx PURE_DETAILED_GIT "{s}"
+        \\set -gx PURE_ICON_AHEAD "{s}"
+        \\set -gx PURE_ICON_BEHIND "{s}"
+        \\set -gx PURE_ICON_CLEAN "{s}"
+        \\set -gx PURE_ICON_STAGED "{s}"
+        \\set -gx PURE_ICON_CONFLICTED "{s}"
+        \\set -gx PURE_ICON_MODIFIED "{s}"
+        \\set -gx PURE_ICON_UNTRACKED "{s}"
         \\
         \\# Pre-command: show directory and git branch
         \\function pure_precmd
@@ -402,7 +493,7 @@ fn printFishInit(allocator: std.mem.Allocator, writer: anytype) !void {
         \\    pure_prompt
         \\end
         \\
-    , .{ exe_path, exe_path });
+    , .{ detailed_val, config.icons.ahead, config.icons.behind, config.icons.clean, config.icons.staged, config.icons.conflicted, config.icons.modified, config.icons.untracked, exe_path, exe_path });
 }
 
 fn printUsage(writer: anytype) !void {
@@ -410,13 +501,24 @@ fn printUsage(writer: anytype) !void {
         \\Pure - Pure-inspired prompt in Zig
         \\
         \\Usage:
-        \\  pure init <shell>     Generate shell init script (bash|zsh|fish)
+        \\  pure init [OPTIONS] <shell>     Generate shell init script (bash|zsh|fish)
         \\
         \\Commands:
         \\  init      Generate shell initialization script
         \\
         \\Options:
         \\  init:
+        \\    --detailed          Show detailed git info (default)
+        \\    --no-detailed       Show minimal git info
+        \\    --icon-ahead TEXT   Icon for ahead commits (default: ↑)
+        \\    --icon-behind TEXT  Icon for behind commits (default: ↓)
+        \\    --icon-clean TEXT   Icon for clean working tree (default: ✔)
+        \\    --icon-staged TEXT  Icon for staged changes (default: ♦)
+        \\    --icon-conflict TEXT Icon for conflicts (default: ✖)
+        \\    --icon-modified TEXT Icon for modified files (default: ✚)
+        \\    --icon-untracked TEXT Icon for untracked files (default: …)
+        \\
+        \\Arguments:
         \\    <shell>              Shell type: bash, zsh, or fish
         \\
         \\Note: precmd and prompt are internal commands used by the generated init.
@@ -444,15 +546,55 @@ pub fn main() !void {
             try printUsage(std.fs.File.stdout().deprecatedWriter());
             std.process.exit(1);
         }
-        const shell = args[2];
+
+        var config = Config{};
+
+        // Parse init options first, shell comes last
+        while (arg_idx < args.len - 1) : (arg_idx += 1) {
+            if (std.mem.eql(u8, args[arg_idx], "--detailed")) {
+                config.detailed_git = true;
+            } else if (std.mem.eql(u8, args[arg_idx], "--no-detailed")) {
+                config.detailed_git = false;
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-ahead")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.ahead = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-behind")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.behind = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-clean")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.clean = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-staged")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.staged = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-conflict")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.conflicted = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-modified")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.modified = args[arg_idx];
+            } else if (std.mem.eql(u8, args[arg_idx], "--icon-untracked")) {
+                arg_idx += 1;
+                if (arg_idx < args.len - 1) config.icons.untracked = args[arg_idx];
+            } else {
+                const stderr = std.fs.File.stderr().deprecatedWriter();
+                try stderr.print("Error: unknown option '{s}'. Shell must be the last argument.\n\n", .{args[arg_idx]});
+                try printUsage(std.fs.File.stdout().deprecatedWriter());
+                std.process.exit(1);
+            }
+        }
+
+        // The last argument is the shell
+        const shell = args[arg_idx];
+
         const stdout = std.fs.File.stdout().deprecatedWriter();
 
         if (std.mem.eql(u8, shell, "bash")) {
-            try printBashInit(allocator, stdout);
+            try printBashInit(allocator, stdout, config);
         } else if (std.mem.eql(u8, shell, "zsh")) {
-            try printZshInit(allocator, stdout);
+            try printZshInit(allocator, stdout, config);
         } else if (std.mem.eql(u8, shell, "fish")) {
-            try printFishInit(allocator, stdout);
+            try printFishInit(allocator, stdout, config);
         } else {
             const stderr = std.fs.File.stderr().deprecatedWriter();
             try stderr.print("Error: unsupported shell '{s}'. Supported shells: bash, zsh, fish\n\n", .{shell});
@@ -460,7 +602,8 @@ pub fn main() !void {
             std.process.exit(1);
         }
     } else if (std.mem.eql(u8, command, "precmd")) {
-        try precmdCommand(allocator, true);
+        const config = try readConfigFromEnv(allocator);
+        try precmdCommand(allocator, config);
     } else if (std.mem.eql(u8, command, "prompt")) {
         var last_return_code: []const u8 = "0";
         var keymap: []const u8 = "US";

@@ -52,6 +52,53 @@ set -o vi
 fish_vi_key_bindings
 ```
 
+## Customization
+
+The `init` command accepts flags to customize the prompt appearance:
+
+### Git Info
+
+- `--detailed` - Show detailed git info (ahead/behind counts, file change counts) - **default**
+- `--no-detailed` - Show minimal git info (only branch and dirty indicator)
+
+### Git Icons
+
+Customize the icons used for git status indicators:
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--icon-ahead` | Ahead commits | `↑` |
+| `--icon-behind` | Behind commits | `↓` |
+| `--icon-clean` | Clean working tree | `✔` |
+| `--icon-staged` | Staged changes | `♦` |
+| `--icon-conflict` | Conflicts | `✖` |
+| `--icon-modified` | Modified files | `✚` |
+| `--icon-untracked` | Untracked files | `…` |
+
+### Examples
+
+```bash
+# Minimal git info with ASCII icons
+eval "$(zig-out/bin/pure init --no-detailed --icon-conflict '!' bash)"
+
+# Custom icons for all git status
+eval "$(zig-out/bin/pure init --icon-ahead 'A' --icon-behind 'B' --icon-clean '✓' zsh)"
+
+# Mix of default and custom icons
+zig-out/bin/pure init --icon-staged '+' --icon-conflict 'x' fish | source
+```
+
+### Runtime Customization
+
+Icons and settings can also be changed at runtime by setting environment variables in your shell config:
+
+```bash
+export PURE_DETAILED_GIT="0"
+export PURE_ICON_AHEAD="A"
+export PURE_ICON_CLEAN="✓"
+export PURE_ICON_MODIFIED="M"
+```
+
 ## Features
 
 - **Path shortening**: Replaces home directory with `~` and compresses long paths
