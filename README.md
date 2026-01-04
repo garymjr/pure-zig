@@ -2,8 +2,6 @@
 
 A [Pure](https://github.com/sindresorhus/pure)-inspired prompt written in Zig.
 
-Even more minimal, definitively faster and at least as pretty as the original Pure by [Sindre Sohrus](https://github.com/sindresorhus).
-
 ## Installation — Usage
 
 ### Using Just (Recommended)
@@ -22,6 +20,7 @@ just uninstall
 ```
 
 To install just:
+
 - macOS: `brew install just`
 - Linux: `cargo install just` or download from [releases](https://github.com/casey/just/releases)
 - Or run via `cargo binstall just` for fast binary install
@@ -60,16 +59,19 @@ zig-out/bin/pure init fish | source
 For vi mode indication in the prompt, enable vi bindings in your shell:
 
 **ZSH:**
+
 ```zsh
 bindkey -v
 ```
 
 **Bash:**
+
 ```bash
 set -o vi
 ```
 
 **Fish:**
+
 ```fish
 fish_vi_key_bindings
 ```
