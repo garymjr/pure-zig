@@ -35,21 +35,21 @@ To install just:
 
 ```zsh
 # Add to ~/.zshrc
-eval "$(zig-out/bin/pure init zsh)"
+eval "$(pure init zsh)"
 ```
 
 ### Bash
 
 ```bash
 # Add to ~/.bashrc
-eval "$(zig-out/bin/pure init bash)"
+eval "$(pure init bash)"
 ```
 
 ### Fish
 
 ```fish
 # Add to ~/.config/fish/config.fish
-zig-out/bin/pure init fish | source
+pure init fish | source
 ```
 
 **Note:** The init command generates shell configuration that embeds the full path to the `pure` binary. If you move the binary, you'll need to re-run the init command.
@@ -103,13 +103,13 @@ Customize the icons used for git status indicators:
 
 ```bash
 # Minimal git info with ASCII icons
-eval "$(zig-out/bin/pure init --no-detailed --icon-conflict '!' bash)"
+eval "$(pure init --no-detailed --icon-conflict '!' bash)"
 
 # Custom icons for all git status
-eval "$(zig-out/bin/pure init --icon-ahead 'A' --icon-behind 'B' --icon-clean '✓' zsh)"
+eval "$(pure init --icon-ahead 'A' --icon-behind 'B' --icon-clean '✓' zsh)"
 
 # Mix of default and custom icons
-zig-out/bin/pure init --icon-staged '+' --icon-conflict 'x' fish | source
+pure init --icon-staged '+' --icon-conflict 'x' fish | source
 ```
 
 ### Runtime Customization
@@ -180,9 +180,9 @@ zig build -Doptimize=ReleaseSmall   # Smallest binary size
 
 ```bash
 # Generate and source shell init script
-eval "$(zig-out/bin/pure init bash)"
-eval "$(zig-out/bin/pure init zsh)"
-zig-out/bin/pure init fish | source
+eval "$(pure init bash)"
+eval "$(pure init zsh)"
+pure init fish | source
 ```
 
 ## Why?
