@@ -37,7 +37,8 @@ pub fn shortenPath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
         } else if (i == num_parts - 1) {
             try parts.append(try allocator.dupe(u8, part));
         } else {
-            const shortened = try allocator.dupe(u8, part[0..1]);
+            const len = if (std.mem.startsWith(u8, part, ".")) @min(2, part.len) else 1;
+            const shortened = try allocator.dupe(u8, part[0..len]);
             try parts.append(shortened);
         }
     }
